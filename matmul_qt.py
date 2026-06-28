@@ -23,6 +23,28 @@ from matrix_model import multiply, resize_matrix
 INITIAL_A = [[1, 2], [3, 4]]
 INITIAL_B = [[5, 6], [7, 8]]
 DIMENSIONS = (1, 2, 3, 4)
+THEORY_NOTES = {
+    "Big picture": (
+        "A matrix is a rectangular grid of numbers. Matrix multiplication combines "
+        "each row of A with each column of B to make one number in C."
+    ),
+    "Size rule": (
+        "A x B is allowed when the columns of A match the rows of B. If A is "
+        "m x n and B is n x p, the result C is m x p."
+    ),
+    "Dot product": (
+        "A dot product means multiply matching numbers, then add them. Example: "
+        "[1, 2] dot [5, 7] = 1*5 + 2*7 = 19."
+    ),
+    "One result cell": (
+        "Each cell C[row, col] comes from one row of A and one column of B. "
+        "That row and column are paired up with a dot product."
+    ),
+    "Order matters": (
+        "Usually A x B is not the same as B x A. Sometimes both work but give "
+        "different answers; sometimes only one order is possible."
+    ),
+}
 
 
 class MainWindow(QMainWindow):
@@ -36,11 +58,17 @@ class MainWindow(QMainWindow):
         self.b = [row[:] for row in INITIAL_B]
         self.c = multiply(self.a, self.b)
 
-        self.setWindowTitle("Learn Matrix Multiplication")
+        self.setWindowTitle("Learn Matrix Multiplication Interactively")
 
         self.m_combo = self._dimension_combo(self.m)
         self.n_combo = self._dimension_combo(self.n)
         self.p_combo = self._dimension_combo(self.p)
+        self.concept_combo = QComboBox()
+        self.concept_combo.addItems(list(THEORY_NOTES))
+        self.concept_explanation = QLabel()
+        self.concept_explanation.setWordWrap(True)
+        self.concept_explanation.setMinimumHeight(54)
+        self.concept_explanation.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.a_table = QTableWidget()
         self.b_table = QTableWidget()
@@ -55,6 +83,7 @@ class MainWindow(QMainWindow):
         root_layout = QVBoxLayout(central)
         root_layout.setContentsMargins(20, 20, 20, 20)
         root_layout.setSpacing(16)
+        root_layout.addWidget(self._theory_panel())
         root_layout.addLayout(self._dimension_controls())
         root_layout.addLayout(self._matrix_layout())
         root_layout.addWidget(self.status_label)
@@ -66,18 +95,19 @@ class MainWindow(QMainWindow):
         self.center_on_screen()
 
         self._connect_signals()
+        self.update_theory_note()
         self.refresh_tables()
 
     def _dimension_combo(self, value):
         combo = QComboBox()
-        combo.addItems(str(number) for number in DIMENSIONS)
+        combo.addItems([str(number) for number in DIMENSIONS])
         combo.setCurrentText(str(value))
         combo.setFixedWidth(72)
         return combo
 
     def _dimension_controls(self):
         layout = QHBoxLayout()
-        layout.setSpacing(12)
+        layout.setSpacing(10)
         layout.addWidget(QLabel("m rows of A"))
         layout.addWidget(self.m_combo)
         layout.addWidget(QLabel("n columns of A / rows of B"))
@@ -86,6 +116,23 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.p_combo)
         layout.addStretch()
         return layout
+
+    def _theory_panel(self):
+        group = QGroupBox("Matrix multiplication reference")
+        group.setStyleSheet(
+            "QGroupBox { font-weight: 600; }"
+            "QLabel { color: #1f2937; }"
+        )
+
+        layout = QHBoxLayout(group)
+        layout.setSpacing(12)
+
+        label = QLabel("Concept")
+        label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(label)
+        layout.addWidget(self.concept_combo)
+        layout.addWidget(self.concept_explanation, stretch=1)
+        return group
 
     def _matrix_layout(self):
         layout = QHBoxLayout()
@@ -127,6 +174,7 @@ class MainWindow(QMainWindow):
         self.m_combo.currentTextChanged.connect(self.update_dimensions)
         self.n_combo.currentTextChanged.connect(self.update_dimensions)
         self.p_combo.currentTextChanged.connect(self.update_dimensions)
+        self.concept_combo.currentTextChanged.connect(self.update_theory_note)
         self.a_table.itemChanged.connect(self.recompute)
         self.b_table.itemChanged.connect(self.recompute)
 
@@ -145,6 +193,11 @@ class MainWindow(QMainWindow):
         frame = self.frameGeometry()
         frame.moveCenter(available.center())
         self.move(frame.topLeft())
+
+    def update_theory_note(self, concept=None):
+        if concept is None:
+            concept = self.concept_combo.currentText()
+        self.concept_explanation.setText(THEORY_NOTES[concept])
 
     def update_dimensions(self):
         self.m = int(self.m_combo.currentText())
