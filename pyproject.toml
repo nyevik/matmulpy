@@ -8,6 +8,7 @@ dependencies = [
 
 [tool.pyside6-project]
 files = [
-    "matrix_mul.py",
     "matmul_qt.py",
+    "matrix_model.py",
+    "matrix_mul.py",
 ]

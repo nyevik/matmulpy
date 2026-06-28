@@ -1,57 +1,141 @@
-"""matrix multiplication teaching tool using PySide6 GUI framework.
-@author: Nikolay Yevik
-"""
+"""Matrix multiplication teaching tool using PySide6."""
 
 import sys
 
-
-from PySide6.QtCore import Qt, QSize, qVersion
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
+    QGroupBox,
     QHBoxLayout,
+    QHeaderView,
+    QLabel,
     QMainWindow,
-    QPushButton,
-    QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-# matrix A and matrix B multiplication"""
+from matrix_model import multiply, resize_matrix
+
+
+INITIAL_A = [[1, 2], [3, 4]]
+INITIAL_B = [[5, 6], [7, 8]]
+DIMENSIONS = (1, 2, 3, 4)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        self.m = 2
+        self.n = 2
+        self.p = 2
+        self.a = [row[:] for row in INITIAL_A]
+        self.b = [row[:] for row in INITIAL_B]
+        self.c = multiply(self.a, self.b)
+
         self.setWindowTitle("Learn Matrix Multiplication")
 
-        button = QPushButton("Multiply Matrices")
-        button.clicked.connect(self.multiply_matrices)
-        button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        button.setMinimumSize(160, 36)
-        button.setMaximumWidth(220)
+        self.m_combo = self._dimension_combo(self.m)
+        self.n_combo = self._dimension_combo(self.n)
+        self.p_combo = self._dimension_combo(self.p)
+
+        self.a_table = QTableWidget()
+        self.b_table = QTableWidget()
+        self.c_table = QTableWidget()
+
+        self.a_group = self._matrix_group("Matrix A", self.a_table)
+        self.b_group = self._matrix_group("Matrix B", self.b_table)
+        self.c_group = self._matrix_group("Matrix C", self.c_table)
+        self.status_label = QLabel()
 
         central = QWidget()
-
-        layout = QVBoxLayout(central)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.addStretch()
-
-        button_row = QHBoxLayout()
-        button_row.addWidget(button)
-        button_row.addStretch()
-        layout.addLayout(button_row)
+        root_layout = QVBoxLayout(central)
+        root_layout.setContentsMargins(20, 20, 20, 20)
+        root_layout.setSpacing(16)
+        root_layout.addLayout(self._dimension_controls())
+        root_layout.addLayout(self._matrix_layout())
+        root_layout.addWidget(self.status_label)
+        root_layout.addStretch()
 
         self.setCentralWidget(central)
-        self.setMinimumSize(640, 420)
+        self.setMinimumSize(760, 480)
         self.resize(self.initial_window_size())
         self.center_on_screen()
+
+        self._connect_signals()
+        self.refresh_tables()
+
+    def _dimension_combo(self, value):
+        combo = QComboBox()
+        combo.addItems(str(number) for number in DIMENSIONS)
+        combo.setCurrentText(str(value))
+        combo.setFixedWidth(72)
+        return combo
+
+    def _dimension_controls(self):
+        layout = QHBoxLayout()
+        layout.setSpacing(12)
+        layout.addWidget(QLabel("m rows of A"))
+        layout.addWidget(self.m_combo)
+        layout.addWidget(QLabel("n columns of A / rows of B"))
+        layout.addWidget(self.n_combo)
+        layout.addWidget(QLabel("p columns of B"))
+        layout.addWidget(self.p_combo)
+        layout.addStretch()
+        return layout
+
+    def _matrix_layout(self):
+        layout = QHBoxLayout()
+        layout.setSpacing(18)
+        layout.addWidget(self.a_group)
+        layout.addWidget(self._operator_label("x"))
+        layout.addWidget(self.b_group)
+        layout.addWidget(self._operator_label("="))
+        layout.addWidget(self.c_group)
+        layout.addStretch()
+        return layout
+
+    def _matrix_group(self, title, table):
+        group = QGroupBox(title)
+        layout = QVBoxLayout(group)
+        layout.addWidget(table)
+        self._prepare_table(table)
+        return group
+
+    def _operator_label(self, text):
+        label = QLabel(text)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet("font-size: 24px; font-weight: 600;")
+        return label
+
+    def _prepare_table(self, table):
+        table.setAlternatingRowColors(True)
+        table.setShowGrid(True)
+        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        table.verticalHeader().setDefaultSectionSize(34)
+        table.horizontalHeader().setDefaultSectionSize(66)
+        table.horizontalHeader().setMinimumSectionSize(58)
+        table.verticalHeader().setMinimumSectionSize(30)
+        table.setMinimumHeight(160)
+        table.setMinimumWidth(180)
+
+    def _connect_signals(self):
+        self.m_combo.currentTextChanged.connect(self.update_dimensions)
+        self.n_combo.currentTextChanged.connect(self.update_dimensions)
+        self.p_combo.currentTextChanged.connect(self.update_dimensions)
+        self.a_table.itemChanged.connect(self.recompute)
+        self.b_table.itemChanged.connect(self.recompute)
 
     def initial_window_size(self):
         screen = QApplication.primaryScreen()
         available = screen.availableGeometry()
 
-        width = min(1100, max(640, int(available.width() * 0.65)))
-        height = min(800, max(420, int(available.height() * 0.65)))
+        width = min(1200, max(760, int(available.width() * 0.70)))
+        height = min(820, max(480, int(available.height() * 0.70)))
 
         return QSize(width, height)
 
@@ -62,57 +146,93 @@ class MainWindow(QMainWindow):
         frame.moveCenter(available.center())
         self.move(frame.topLeft())
 
-    def multiply_matrices(self):
-        A = [[1, 2], [3, 4]]
-        B = [[5, 6], [7, 8]]
+    def update_dimensions(self):
+        self.m = int(self.m_combo.currentText())
+        self.n = int(self.n_combo.currentText())
+        self.p = int(self.p_combo.currentText())
 
-        C = self.mat_mul(A, B)
-        matrix_print(C, "C")
+        self.a = resize_matrix(self.a, self.m, self.n)
+        self.b = resize_matrix(self.b, self.n, self.p)
+        self.c = multiply(self.a, self.b)
+        self.refresh_tables()
 
-        C2 = self.my_mat_mul(A, B)
-        matrix_print(C2, "C2")
+    def refresh_tables(self):
+        self.a_group.setTitle(f"Matrix A ({self.m} x {self.n})")
+        self.b_group.setTitle(f"Matrix B ({self.n} x {self.p})")
+        self.c_group.setTitle(f"Matrix C ({self.m} x {self.p})")
 
-    def mat_mul(self, A, B):
-        result = [[0, 0], [0, 0]]
-        matrix_print(result, "result before multiplication")
-        for i in range(len(A)):
-            for j in range(len(B[0])):
-                for k in range(len(B)):
-                    result[i][j] += A[i][k] * B[k][j]
-        return result
+        self.configure_table(self.a_table, self.m, self.n, editable=True)
+        self.configure_table(self.b_table, self.n, self.p, editable=True)
+        self.configure_table(self.c_table, self.m, self.p, editable=False)
 
-    def my_mat_mul(self,  A, B):
-        C = [[0, 0], [0, 0]]
-        C[0][0] = A[0][0] * B[0][0] + A[0][1] * B[1][0]
-        print("C[0][0]=", C[0][0])
-        C[0][1] = A[0][0] * B[0][1] + A[0][1] * B[1][1]
-        print("C[0][1]=", C[0][1])
-        C[1][0] = A[1][0] * B[0][0] + A[1][1] * B[1][0]
-        print("C[1][0]=", C[1][0])
-        C[1][1] = A[1][0] * B[0][1] + A[1][1] * B[1][1]
-        print("C[1][1]=", C[1][1])
-        return C
-# End Class
+        self.load_matrix(self.a_table, self.a)
+        self.load_matrix(self.b_table, self.b)
+        self.load_matrix(self.c_table, self.c)
+        self.status_label.setText("C updates when you edit A or B.")
 
+    def configure_table(self, table, rows, cols, editable):
+        table.blockSignals(True)
+        table.setRowCount(rows)
+        table.setColumnCount(cols)
+        table.setHorizontalHeaderLabels(str(col + 1) for col in range(cols))
+        table.setVerticalHeaderLabels(str(row + 1) for row in range(rows))
 
-def matrix_print(matrix, name):
-    print ("Matrix name:", name)
-    for row in matrix:
-        print(row)
-    #print(matrix)
+        for row in range(rows):
+            for col in range(cols):
+                item = QTableWidgetItem("0")
+                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if not editable:
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    item.setBackground(Qt.GlobalColor.lightGray)
+                table.setItem(row, col, item)
 
+        table.blockSignals(False)
 
-def my_mat_mul(A, B):
-    C = [[0, 0], [0, 0]]
-    C[0][0] = A[0][0] * B[0][0] + A[0][1] * B[1][0]
-    print("C[0][0]=", C[0][0])
-    C[0][1] = A[0][0] * B[0][1] + A[0][1] * B[1][1]
-    print("C[0][1]=", C[0][1])
-    C[1][0] = A[1][0] * B[0][0] + A[1][1] * B[1][0]
-    print("C[1][0]=", C[1][0])
-    C[1][1] = A[1][0] * B[0][1] + A[1][1] * B[1][1]
-    print("C[1][1]=", C[1][1])
-    return C
+    def load_matrix(self, table, matrix):
+        table.blockSignals(True)
+        for row, values in enumerate(matrix):
+            for col, value in enumerate(values):
+                table.item(row, col).setText(self._format_number(value))
+        table.blockSignals(False)
+
+    def read_matrix(self, table):
+        values = []
+        for row in range(table.rowCount()):
+            matrix_row = []
+            for col in range(table.columnCount()):
+                matrix_row.append(self._read_number(table, row, col))
+            values.append(matrix_row)
+        return values
+
+    def recompute(self):
+        try:
+            self.a = self.read_matrix(self.a_table)
+            self.b = self.read_matrix(self.b_table)
+            self.c = multiply(self.a, self.b)
+        except ValueError as error:
+            self.status_label.setText(str(error))
+            return
+
+        self.load_matrix(self.c_table, self.c)
+        self.status_label.setText("C = A x B")
+
+    def _read_number(self, table, row, col):
+        item = table.item(row, col)
+        text = item.text().strip() if item else ""
+        if not text:
+            raise ValueError(f"Cell ({row + 1}, {col + 1}) is empty")
+
+        try:
+            value = float(text)
+        except ValueError as error:
+            raise ValueError(f"Cell ({row + 1}, {col + 1}) is not a number") from error
+
+        return int(value) if value.is_integer() else value
+
+    def _format_number(self, value):
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+        return str(value)
 
 
 def main():
