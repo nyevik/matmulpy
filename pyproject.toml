@@ -1,0 +1,13 @@
+[project]
+name = "matmulpy"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "PySide6==6.11.1",
+]
+
+[tool.pyside6-project]
+files = [
+    "matrix_mul.py",
+    "matmul_qt.py",
+]

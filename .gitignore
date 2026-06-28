@@ -1,0 +1,91 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+
+# Python packaging/build output
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+pip-wheel-metadata/
+
+# Test, coverage, and type-check caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.pyre/
+.ruff_cache/
+
+# PySide/Qt generated files and local Qt Creator state
+ui_*.py
+*_rc.py
+.qtcreator/
+*.user
+*.user.*
+*.autosave
+
+# CMake/Qt build folders and local presets
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+CMakeUserPresets.json
+
+# VS Code and local workspace settings
+.vscode/
+*.code-workspace
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*.token
+*.secret
+secrets.*
+credentials.*
+
+# Python/package manager credentials
+.pypirc
+pip.conf
+pip.ini
+poetry.toml
+
+# Local data stores and scratch output
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
+tmp/
+temp/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.idea/
