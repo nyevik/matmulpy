@@ -2,7 +2,8 @@
 
 import sys
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QEvent, QSize, Qt
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -23,6 +24,12 @@ from matrix_model import multiply, resize_matrix
 INITIAL_A = [[1, 2], [3, 4]]
 INITIAL_B = [[5, 6], [7, 8]]
 DIMENSIONS = (1, 2, 3, 4)
+A_BASE_COLOR = QColor("#ffffff")
+A_ROW_COLOR = QColor("#fff2a8")
+B_BASE_COLOR = QColor("#ffffff")
+B_COLUMN_COLOR = QColor("#bfe3ff")
+C_BASE_COLOR = QColor("#eeeeee")
+C_CELL_COLOR = QColor("#c8f7c5")
 THEORY_NOTES = {
     "Big picture": (
         "A matrix is a rectangular grid of numbers. Matrix multiplication combines "
@@ -57,6 +64,7 @@ class MainWindow(QMainWindow):
         self.a = [row[:] for row in INITIAL_A]
         self.b = [row[:] for row in INITIAL_B]
         self.c = multiply(self.a, self.b)
+        self.hovered_c_cell = None
 
         self.setWindowTitle("Learn Matrix Multiplication Interactively")
 
@@ -177,6 +185,10 @@ class MainWindow(QMainWindow):
         self.concept_combo.currentTextChanged.connect(self.update_theory_note)
         self.a_table.itemChanged.connect(self.recompute)
         self.b_table.itemChanged.connect(self.recompute)
+        self.c_table.setMouseTracking(True)
+        self.c_table.viewport().setMouseTracking(True)
+        self.c_table.cellEntered.connect(self.highlight_contributors)
+        self.c_table.viewport().installEventFilter(self)
 
     def initial_window_size(self):
         screen = QApplication.primaryScreen()
@@ -194,6 +206,11 @@ class MainWindow(QMainWindow):
         frame.moveCenter(available.center())
         self.move(frame.topLeft())
 
+    def eventFilter(self, watched, event):
+        if watched is self.c_table.viewport() and event.type() == QEvent.Type.Leave:
+            self.clear_highlights()
+        return super().eventFilter(watched, event)
+
     def update_theory_note(self, concept=None):
         if concept is None:
             concept = self.concept_combo.currentText()
@@ -204,6 +221,7 @@ class MainWindow(QMainWindow):
         self.n = int(self.n_combo.currentText())
         self.p = int(self.p_combo.currentText())
 
+        self.hovered_c_cell = None
         self.a = resize_matrix(self.a, self.m, self.n)
         self.b = resize_matrix(self.b, self.n, self.p)
         self.c = multiply(self.a, self.b)
@@ -234,9 +252,11 @@ class MainWindow(QMainWindow):
             for col in range(cols):
                 item = QTableWidgetItem("0")
                 item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                if not editable:
+                if editable:
+                    item.setBackground(QBrush(A_BASE_COLOR))
+                else:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    item.setBackground(Qt.GlobalColor.lightGray)
+                    item.setBackground(QBrush(C_BASE_COLOR))
                 table.setItem(row, col, item)
 
         table.blockSignals(False)
@@ -268,6 +288,74 @@ class MainWindow(QMainWindow):
 
         self.load_matrix(self.c_table, self.c)
         self.status_label.setText("C = A x B")
+        if self.hovered_c_cell is not None:
+            row, col = self.hovered_c_cell
+            if row < self.c_table.rowCount() and col < self.c_table.columnCount():
+                self.highlight_contributors(row, col)
+
+    def clear_highlights(self):
+        self.hovered_c_cell = None
+        self._reset_table_backgrounds()
+        self.status_label.setText(
+            "Hover over a C cell to see which A row and B column create it."
+        )
+
+    def highlight_contributors(self, c_row, c_col):
+        self.hovered_c_cell = (c_row, c_col)
+        self._reset_table_backgrounds()
+
+        self._with_table_signals_blocked(
+            self.a_table,
+            lambda: self._highlight_a_row(c_row),
+        )
+        self._with_table_signals_blocked(
+            self.b_table,
+            lambda: self._highlight_b_column(c_col),
+        )
+        self._with_table_signals_blocked(
+            self.c_table,
+            lambda: self.c_table.item(c_row, c_col).setBackground(QBrush(C_CELL_COLOR)),
+        )
+
+        self.status_label.setText(
+            f"C[{c_row + 1}, {c_col + 1}] uses row {c_row + 1} of A "
+            f"and column {c_col + 1} of B."
+        )
+
+    def _reset_table_backgrounds(self):
+        for table, color in ((self.a_table, A_BASE_COLOR), (self.b_table, B_BASE_COLOR)):
+            self._with_table_signals_blocked(
+                table,
+                lambda table=table, color=color: self._reset_table_background(table, color),
+            )
+
+        self._with_table_signals_blocked(
+            self.c_table,
+            lambda: self._reset_table_background(self.c_table, C_BASE_COLOR),
+        )
+
+    def _highlight_a_row(self, row):
+        for col in range(self.a_table.columnCount()):
+            self.a_table.item(row, col).setBackground(QBrush(A_ROW_COLOR))
+
+    def _highlight_b_column(self, col):
+        for row in range(self.b_table.rowCount()):
+            self.b_table.item(row, col).setBackground(QBrush(B_COLUMN_COLOR))
+
+    def _reset_table_background(self, table, color):
+        brush = QBrush(color)
+        for row in range(table.rowCount()):
+            for col in range(table.columnCount()):
+                item = table.item(row, col)
+                if item is not None:
+                    item.setBackground(brush)
+
+    def _with_table_signals_blocked(self, table, callback):
+        signals_were_blocked = table.blockSignals(True)
+        try:
+            callback()
+        finally:
+            table.blockSignals(signals_were_blocked)
 
     def _read_number(self, table, row, col):
         item = table.item(row, col)
